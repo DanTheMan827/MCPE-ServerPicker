@@ -483,6 +483,9 @@ async function openAddServer(player, returnMenu = openServerMenu) {
     .textField("Port", port, {
       description: "Enter a port from 1 through 65535.",
     })
+    .spacer({
+      visible: statusVisible,
+    })
     .label(status, {
       visible: statusVisible,
     })
