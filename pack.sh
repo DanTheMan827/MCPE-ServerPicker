@@ -201,11 +201,11 @@ jq \
 
 mv "$TMP" "$MANIFEST"
 
-echo "Creating $OUTPUT.mcpack..."
+echo "Creating $PACK_NAME.mcpack..."
 
-rm -f "$OUTPUT.mcpack"
+rm -f "$PACK_NAME.mcpack"
 
-zip -rq "$OUTPUT.mcpack" . \
+zip -rq "$PACK_NAME.mcpack" . \
     -x ".git/*" \
     -x ".github/*" \
     -x ".gitignore" \
@@ -220,4 +220,4 @@ echo
 echo "Header UUID : $HEADER_UUID"
 echo "Data UUID   : $DATA_UUID"
 echo "Script UUID : $SCRIPT_UUID"
-echo "Output      : $OUTPUT.mcpack"
+echo "Output      : $PACK_NAME.mcpack"
