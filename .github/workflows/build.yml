@@ -19,9 +19,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Make pack.sh executable
-        run: chmod +x ./pack.sh
-
       - name: Build packs
         shell: bash
         run: |

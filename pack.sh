@@ -259,6 +259,7 @@ zip -rq "$PACK_NAME.mcpack" . \
     -x ".git/*" \
     -x ".github/*" \
     -x ".gitignore" \
+    -x ".gitattributes" \
     -x "README.md" \
     -x "readme.md" \
     -x "pack.sh" \
