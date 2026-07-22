@@ -1,1 +1,6 @@
 *.mcpack
+*.mcworld
+world/world_behavior_packs.json
+world/world_resource_packs.json
+world/behavior_packs/ServerPicker
+world/level.dat_old

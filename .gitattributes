@@ -2,3 +2,6 @@
 * text eol=lf
 
 *.png binary
+*.jpeg binary
+world/level.dat binary
+world/db/* binary

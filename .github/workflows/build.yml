@@ -19,20 +19,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build packs
+      - name: Build pack
         shell: bash
         run: |
-          if [[ "${{ github.ref_type }}" == "tag" && "${{ github.ref_name }}" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
-            ./pack.sh "${BASH_REMATCH[1]}"
-          else
-            ./pack.sh
-          fi
+          ./pack.sh
+
+      - name: Build world
+        shell: bash
+        run: |
+          ./pack_world.sh
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: minecraft-packs
-          path: "*.mcpack"
+          path: |
+            *.mcpack
+            *.mcworld
           if-no-files-found: error
 
       - name: Create GitHub Release
@@ -41,4 +44,6 @@ jobs:
         with:
           tag_name: ${{ github.ref_name }}
           name: ${{ github.ref_name }}
-          files: "*.mcpack"
+          files: |
+            *.mcpack
+            *.mcworld

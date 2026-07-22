@@ -1,3 +1,9 @@
+/**
+ * @fileoverview Main script for the Minecraft server picker.
+ * @author DanTheMan827
+ * @license GPL-3.0-or-later
+ */
+
 import { GameMode, system, world } from "@minecraft/server";
 
 import {

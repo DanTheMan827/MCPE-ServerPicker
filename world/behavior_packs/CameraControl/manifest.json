@@ -1,0 +1,51 @@
+{
+  "format_version": 2,
+  "header": {
+    "name": "Camera Control v1.0.0",
+    "description": "A Minecraft Bedrock Edition behavior pack that adds §b/setcamera§r and §b/clearcamera§r commands. Created by §bDanTheMan827§r",
+    "uuid": "eb6eccb8-cc42-4b73-b28a-5110797f07f5",
+    "version": [
+      1,
+      0,
+      0
+    ],
+    "min_engine_version": [
+      1,
+      21,
+      70
+    ]
+  },
+  "modules": [
+    {
+      "type": "data",
+      "uuid": "547e7ef1-2f1c-4a3c-8495-b029ba951e9a",
+      "version": [
+        1,
+        0,
+        0
+      ]
+    },
+    {
+      "type": "script",
+      "uuid": "ba33388c-9c48-4d3c-abb4-d4d4398842ed",
+      "version": [
+        1,
+        0,
+        0
+      ],
+      "language": "javascript",
+      "entry": "scripts/index.js"
+    }
+  ],
+  "metadata": {
+    "authors": [
+      "DanTheMan827"
+    ]
+  },
+  "dependencies": [
+    {
+      "module_name": "@minecraft/server",
+      "version": "2.8.0"
+    }
+  ]
+}
