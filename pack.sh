@@ -17,11 +17,6 @@ cd "$PACK_DIR" || {
     exit 1
 }
 
-MANIFEST="manifest.json"
-SCRIPT="scripts/index.js"
-PACK_NAME="Server Picker"
-DEFAULT_VERSION="1.0.0"
-
 require() {
     command -v "$1" >/dev/null 2>&1 || {
         echo "Error: '$1' is required."
@@ -29,22 +24,50 @@ require() {
     }
 }
 
+require git
 require jq
 require sha256sum
 require zip
 
+MANIFEST="manifest.json"
+SCRIPT="scripts/index.js"
+DEFAULT_VERSION="1.0.0"
+
+MANIFEST_NAME="$(
+    jq -er '
+        .header.name
+        | select(type == "string" and length > 0)
+    ' "$MANIFEST"
+)" || {
+    echo "Error: '$MANIFEST' does not contain a valid header.name."
+    exit 1
+}
+
+PACK_NAME="$MANIFEST_NAME"
+
+# Remove a trailing version from the manifest name, if present.
+#
+# Examples:
+#   Pack Name v1.2.3
+#   Pack Name v1.2.3-test
+#   Pack Name v1.2.3+metadata
+#   Pack Name v1.2.3-test+metadata
+if [[ "$PACK_NAME" =~ ^(.*[^[:space:]])[[:space:]]+v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[^[:space:]]+)?$ ]]; then
+    PACK_NAME="${BASH_REMATCH[1]}"
+fi
+
 set_manifest_version() {
     local version="$1"
-    local major minor patch extra
+    local major minor patch
     local tmp
 
-    IFS='.' read -r major minor patch extra <<< "$version"
-
-    if [[ -n "${extra:-}" ]] ||
-       [[ ! "$major" =~ ^[0-9]+$ ]] ||
-       [[ ! "$minor" =~ ^[0-9]+$ ]] ||
-       [[ ! "$patch" =~ ^[0-9]+$ ]]; then
-        echo "Error: Version must use the format major.minor.patch, such as 1.2.3."
+    # Extract only the numeric major, minor, and patch components.
+    if [[ "$version" =~ ^v?([0-9]+)\.([0-9]+)\.([0-9]+) ]]; then
+        major="${BASH_REMATCH[1]}"
+        minor="${BASH_REMATCH[2]}"
+        patch="${BASH_REMATCH[3]}"
+    else
+        echo "Error: Version '$version' does not begin with a valid X.Y.Z version."
         return 1
     fi
 
@@ -137,16 +160,43 @@ hash_to_uuid() {
         "${hex:20:12}"
 }
 
-if [[ -n "${1:-}" ]]; then
-    VERSION="$1"
+get_git_version() {
+    local tag
+    local version
+    local short_hash
 
-    echo "Setting manifest version to $VERSION..."
-    set_manifest_version "$VERSION"
-else
-    VERSION="$(
-        jq -r '.header.version | map(tostring) | join(".")' "$MANIFEST"
-    )"
-fi
+    # Use the latest tag reachable from HEAD.
+    tag="$(git describe --tags --abbrev=0 2>/dev/null || true)"
+
+    if [[ -z "$tag" ]]; then
+        version="$DEFAULT_VERSION"
+    elif [[ "$tag" =~ ^v?([0-9]+)\.([0-9]+)\.([0-9]+)([-+].*)?$ ]]; then
+        version="${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.${BASH_REMATCH[3]}${BASH_REMATCH[4]:-}"
+    else
+        echo "Warning: Latest Git tag '$tag' is not a supported version tag." >&2
+        echo "Warning: Using default version $DEFAULT_VERSION." >&2
+        version="$DEFAULT_VERSION"
+    fi
+
+    # Append the short commit hash when HEAD is not exactly on the tag.
+    if ! git describe --tags --exact-match >/dev/null 2>&1; then
+        short_hash="$(git rev-parse --short HEAD)"
+        version="${version}-${short_hash}"
+    fi
+
+    # Append "-dirty" when tracked or untracked files have changes.
+    if [[ -n "$(git status --porcelain)" ]]; then
+        version="${version}-dirty"
+    fi
+
+    printf '%s\n' "$version"
+}
+
+VERSION="$(get_git_version)"
+
+echo "Build version: $VERSION"
+echo "Setting manifest numeric version..."
+set_manifest_version "$VERSION"
 
 OUTPUT="${PACK_NAME} v${VERSION}"
 
@@ -217,6 +267,7 @@ zip -rq "$PACK_NAME.mcpack" . \
 echo
 echo "Build complete."
 echo
+echo "Version     : $VERSION"
 echo "Header UUID : $HEADER_UUID"
 echo "Data UUID   : $DATA_UUID"
 echo "Script UUID : $SCRIPT_UUID"
