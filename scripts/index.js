@@ -17,7 +17,10 @@ import {
 import { transferPlayer } from "@minecraft/server-admin";
 
 const SERVERS_KEY = "servers";
-const MENU_RETRY_DELAY = 50;
+const MENU_RETRY_DELAY = 4;
+
+/** @type {Set<string>} */
+const selectorPlayers = new Set();
 
 /**
  * @typedef {Object} ServerEntry
@@ -82,9 +85,7 @@ function normalizeServer(value) {
   }
 
   const name = typeof value.name === "string" ? value.name.trim() : "";
-
   const ip = typeof value.ip === "string" ? value.ip.trim() : "";
-
   const port = Number(value.port);
 
   if (!name || !ip || !isValidPort(port)) {
@@ -189,9 +190,7 @@ function formatServerButton(server) {
  */
 function formatServerDropdownItem(draft) {
   const name = draft.name.trim() || "(Unnamed Server)";
-
   const ip = draft.ip.trim() || "(No Hostname)";
-
   const port = draft.port.trim() || "?";
 
   return `${name} — ${ip}:${port}`;
@@ -302,6 +301,8 @@ function navigateTo(form, player, menu) {
  * @param {import("@minecraft/server").Player} player
  */
 function killPlayerFromSelector(player) {
+  selectorPlayers.delete(player.id);
+
   system.run(() => {
     try {
       player.kill();
@@ -315,48 +316,38 @@ function killPlayerFromSelector(player) {
 }
 
 /**
- * Shows a CustomForm and handles how it was closed.
+ * Shows a CustomForm and delegates each close reason to
+ * the menu that owns the form.
  *
  * @param {CustomForm} form
  * @param {import("@minecraft/server").Player} player
  * @param {{
- *   fallbackMenu?: (
+ *   onUserBusy?: (
  *     player: import("@minecraft/server").Player
  *   ) => void | Promise<void>,
  *   onClientClosed?: (
  *     player: import("@minecraft/server").Player
- *   ) => void | Promise<void>,
- *   retryDelay?: number
+ *   ) => void | Promise<void>
  * }} options
  */
-async function showForm(
-  form,
-  player,
-  {
-    fallbackMenu = openServerMenu,
-    onClientClosed,
-    retryDelay = MENU_RETRY_DELAY,
-  } = {},
-) {
+async function showForm(form, player, { onUserBusy, onClientClosed } = {}) {
   try {
     const closeReason = await form.show();
 
     switch (closeReason) {
       case DataDrivenScreenClosedReason.UserBusy:
-        if (fallbackMenu) {
-          scheduleMenu(player, fallbackMenu, retryDelay);
+        if (onUserBusy) {
+          scheduleMenu(player, onUserBusy, MENU_RETRY_DELAY);
         }
         break;
 
       case DataDrivenScreenClosedReason.ClientClosed:
         if (onClientClosed) {
           await onClientClosed(player);
-        } else if (fallbackMenu) {
-          scheduleMenu(player, fallbackMenu);
         }
         break;
 
-      // Programmatic navigation closes forms from the server.
+      // Button navigation closes the current form from the server.
       case DataDrivenScreenClosedReason.ServerClosed:
       default:
         break;
@@ -442,9 +433,8 @@ async function openServerMenu(player) {
   }
 
   await showForm(form, player, {
-    fallbackMenu: openServerMenu,
+    onUserBusy: openServerMenu,
     onClientClosed: killPlayerFromSelector,
-    retryDelay: 4,
   });
 }
 
@@ -531,7 +521,8 @@ async function openAddServer(player, returnMenu = openServerMenu) {
     });
 
   await showForm(form, player, {
-    fallbackMenu: returnMenu,
+    onUserBusy: (currentPlayer) => openAddServer(currentPlayer, returnMenu),
+    onClientClosed: returnMenu,
   });
 }
 
@@ -887,10 +878,11 @@ async function openManageMenu(player, initialIndex = 0) {
     });
 
   await showForm(form, player, {
-    fallbackMenu: openServerMenu,
-    onClientClosed: (player) => {
+    onUserBusy: (currentPlayer) => openManageMenu(currentPlayer, currentIndex),
+
+    onClientClosed: (currentPlayer) => {
       persistDrafts("");
-      navigateTo(form, player, openServerMenu);
+      scheduleMenu(currentPlayer, openServerMenu);
     },
   });
 }
@@ -901,9 +893,17 @@ world.afterEvents.worldLoad.subscribe(() => {
 });
 
 /**
- * Opens the selector whenever a player joins or respawns.
+ * Opens one selector flow per player. Some world loads can
+ * emit playerSpawn more than once, so duplicate events are
+ * ignored until the player leaves or intentionally exits.
  */
 world.afterEvents.playerSpawn.subscribe(({ player }) => {
+  if (selectorPlayers.has(player.id)) {
+    return;
+  }
+
+  selectorPlayers.add(player.id);
+
   /*
    * Waiting until the next tick ensures the player has
    * entered the world before changing mode and opening UI.
@@ -912,4 +912,8 @@ world.afterEvents.playerSpawn.subscribe(({ player }) => {
     setSelectorGameMode(player);
     void openServerMenu(player);
   });
+});
+
+world.afterEvents.playerLeave.subscribe(({ playerId }) => {
+  selectorPlayers.delete(playerId);
 });
